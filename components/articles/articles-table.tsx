@@ -1,7 +1,12 @@
-import { articles } from '@/lib/mock-data';
+import { articles as mockArticles } from '@/lib/mock-data';
 import { Search, SlidersHorizontal } from 'lucide-react';
 
-export function ArticlesTable() {
+interface ArticlesTableProps {
+  newArticles?: any[];
+}
+
+export function ArticlesTable({ newArticles = [] }: ArticlesTableProps) {
+  const allArticles = [...newArticles, ...mockArticles];
   const getCategoryColor = (category: string) => {
     const colors: { [key: string]: string } = {
       Cardiology: 'text-blue-600',
@@ -70,7 +75,7 @@ export function ArticlesTable() {
             </tr>
           </thead>
           <tbody>
-            {articles.map((article) => (
+            {allArticles.map((article) => (
               <tr
                 key={article.id}
                 className="border-b border-gray-100 hover:bg-gray-50"
