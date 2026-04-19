@@ -1,69 +1,51 @@
 import { useEffect, useState } from "react";
-import { Search } from "lucide-react";
-
-export type User = {
-  id: string;
-  fullName: string;
-  email: string;
-  role: string;
-  status: "ACTIVE" | "SUSPENDED" | "DELETED";
-
-  dateOfBirth?: string;
-  heightCm?: number;
-  weightKg?: number;
-
-  avatarUrl?: string;
-  lastLogin?: string;
-};
-
-// 🎯 MOCK DATA
-const mockUsers: User[] = [
-  {
-    id: "U001",
-    fullName: "Nguyen Van A",
-    email: "a@gmail.com",
-    role: "USER",
-    status: "ACTIVE",
-    dateOfBirth: "1995-05-20",
-    heightCm: 170,
-    weightKg: 65,
-    avatarUrl: "https://i.pravatar.cc/150?img=1",
-    lastLogin: "2026-03-20",
-  },
-  {
-    id: "U002",
-    fullName: "Tran Thi B",
-    email: "b@gmail.com",
-    role: "USER",
-    status: "SUSPENDED",
-    dateOfBirth: "2000-08-10",
-    heightCm: 160,
-    weightKg: 50,
-    avatarUrl: "https://i.pravatar.cc/150?img=2",
-  },
-  {
-    id: "U003",
-    fullName: "Le Van C",
-    email: "c@gmail.com",
-    role: "USER",
-    status: "ACTIVE",
-    dateOfBirth: "1988-01-15",
-    heightCm: 175,
-    weightKg: 70,
-    avatarUrl: "https://i.pravatar.cc/150?img=3",
-  },
-];
+import { Search, Loader2 } from "lucide-react";
+import { apiClient, UserResponse } from "@/lib/api-client";
 
 export function UsersTable() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserResponse[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<UserResponse[]>([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [changingRole, setChangingRole] = useState<string | null>(null);
 
-  // LOAD MOCK DATA
+  // LOAD API DATA
   useEffect(() => {
-    setUsers(mockUsers);
-    setFilteredUsers(mockUsers);
+    const fetchUsers = async () => {
+      try {
+        const data = await apiClient.getUsers();
+        setUsers(data);
+        setFilteredUsers(data);
+      } catch (error) {
+        console.error("Failed to fetch users", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUsers();
   }, []);
+
+  const handleRoleToggle = async (userId: string, currentRole: string) => {
+    try {
+      setChangingRole(userId);
+      const newRole = currentRole === 'ADMIN' ? 'USER' : 'ADMIN';
+      const updatedUser = await apiClient.changeUserRole(userId, newRole);
+      
+      const newUsers = users.map(u => u.id === userId ? updatedUser : u);
+      setUsers(newUsers);
+      setFilteredUsers(newUsers.filter(
+        (user) =>
+          user.fullName?.toLowerCase().includes(search.toLowerCase()) ||
+          user.email?.toLowerCase().includes(search.toLowerCase()) ||
+          user.id?.toLowerCase().includes(search.toLowerCase())
+      ));
+    } catch (error) {
+      console.error("Failed to change user role", error);
+      alert("Cập nhật quyền thất bại!");
+    } finally {
+      setChangingRole(null);
+    }
+  };
 
   // TÍNH AGE
   const getAge = (dob?: string) => {
@@ -82,9 +64,9 @@ export function UsersTable() {
   useEffect(() => {
     const result = users.filter(
       (user) =>
-        user.fullName.toLowerCase().includes(search.toLowerCase()) ||
-        user.email.toLowerCase().includes(search.toLowerCase()) ||
-        user.id.toLowerCase().includes(search.toLowerCase())
+        user.fullName?.toLowerCase().includes(search.toLowerCase()) ||
+        user.email?.toLowerCase().includes(search.toLowerCase()) ||
+        user.id?.toLowerCase().includes(search.toLowerCase())
     );
     setFilteredUsers(result);
   }, [search, users]);
@@ -115,7 +97,12 @@ export function UsersTable() {
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full">
+        {loading ? (
+          <div className="flex justify-center items-center p-12">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          </div>
+        ) : (
+          <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
               <th className="py-4 px-6 text-left text-xs font-semibold">User</th>
@@ -123,7 +110,7 @@ export function UsersTable() {
               <th className="py-4 px-6 text-left text-xs font-semibold">Height</th>
               <th className="py-4 px-6 text-left text-xs font-semibold">Weight</th>
               <th className="py-4 px-6 text-left text-xs font-semibold">Status</th>
-              <th className="py-4 px-6 text-left text-xs font-semibold">Action</th>
+              <th className="py-4 px-6 text-left text-xs font-semibold">Role</th>
             </tr>
           </thead>
 
@@ -135,10 +122,11 @@ export function UsersTable() {
                   <div className="flex items-center gap-3">
                     <img
                       src={user.avatarUrl || "https://i.pravatar.cc/150"}
+                      alt={user.fullName || "User"}
                       className="w-10 h-10 rounded-full"
                     />
                     <div>
-                      <p className="font-medium">{user.fullName}</p>
+                      <p className="font-medium">{user.fullName || "User"}</p>
                       <p className="text-sm text-gray-500">{user.email}</p>
                     </div>
                   </div>
@@ -168,10 +156,14 @@ export function UsersTable() {
                   </span>
                 </td>
 
-                {/* ACTION */}
+                {/* ROLE / ACTION */}
                 <td className="py-4 px-6">
-                  <button className="text-blue-600 text-sm hover:underline">
-                    Edit
+                  <button 
+                    onClick={() => handleRoleToggle(user.id, user.role)}
+                    disabled={changingRole === user.id}
+                    className={`px-3 py-1 text-xs font-semibold rounded border ${user.role === 'ADMIN' ? 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'}`}
+                  >
+                    {changingRole === user.id ? 'Updating...' : user.role}
                   </button>
                 </td>
               </tr>
@@ -186,6 +178,7 @@ export function UsersTable() {
             )}
           </tbody>
         </table>
+        )}
       </div>
     </div>
   );

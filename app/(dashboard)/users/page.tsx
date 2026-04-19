@@ -3,8 +3,10 @@
 import { Sidebar } from '@/components/sidebar';
 import { UsersTable } from '@/components/users/users-table';
 import { Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function UsersPage() {
+  const router = useRouter();
   return (
     <div className="flex">
       <Sidebar />
@@ -20,7 +22,10 @@ export default function UsersPage() {
                 Manage access, roles, and status for all hospital staff.
               </p>
             </div>
-            <button className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+            <button 
+              onClick={() => router.push('/register')}
+              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+            >
               <Plus size={20} />
               Add New User
             </button>

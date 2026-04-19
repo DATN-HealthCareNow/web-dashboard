@@ -1,25 +1,22 @@
 'use client';
-import Image from "next/image";
+
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { useAuth } from '@/components/auth/auth-context';
+import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   FileText,
   Users,
   Calendar,
-  BarChart3,
   Pill,
   LogOut,
 } from 'lucide-react';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/reports', label: 'Health Reports', icon: FileText },
   { href: '/articles', label: 'Article Management', icon: Pill },
   { href: '/users', label: 'User Management', icon: Users },
-  { href: '/analytics', label: 'Revenue Analytics', icon: BarChart3 },
 ];
 
 export function Sidebar() {
@@ -36,20 +33,12 @@ export function Sidebar() {
     <aside className="w-64 bg-gradient-to-b from-blue-50 to-blue-50 border-r border-blue-100 h-screen fixed left-0 top-0 overflow-y-auto">
       {/* Logo */}
       <div className="p-6 border-b border-blue-100">
-          <div className="flex items-center gap-3">
-        <div className="relative w-10 h-10">
-          <Image
-            src="/logo.jpg"
-            alt="MediCare logo"
-            fill
-            className="object-contain"
-            priority
-          />
+        <div className="flex items-center gap-2">
+          <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white shadow-sm border border-gray-100">
+            <img src="/logo.jpg" alt="HealthyCareNow Logo" className="w-full h-full object-cover" />
+          </div>
+          <h1 className="font-bold text-lg text-gray-900">HealthyCareNow</h1>
         </div>
-        <h1 className="font-bold text-xl text-gray-900 tracking-tight">
-          HealthcareNow
-        </h1>
-    </div>
       </div>
 
       {/* Navigation */}
