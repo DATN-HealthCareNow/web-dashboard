@@ -9,11 +9,13 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Heart, Eye, EyeOff, AlertCircle } from 'lucide-react';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
-  const { login, isLoading } = useAuth();
+  const { register, isLoading } = useAuth();
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -21,13 +23,19 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      await login(email, password);
+      await register(email, password, fullName);
       router.push('/');
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.');
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -49,39 +57,41 @@ export default function LoginPage() {
 
           <div className="space-y-4">
             <h2 className="text-5xl font-bold text-gray-900 leading-tight">
-              Healthcare Management at Your Fingertips
+              Join the Future of Healthcare
             </h2>
             <p className="text-xl text-gray-600 max-w-md mx-auto">
-              Manage patient records, appointments, and analytics all in one secure platform
+              Create an account to start managing patient records, appointments, and more.
             </p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4 pt-8">
-            <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="text-3xl font-bold text-blue-600 mb-2">1000+</div>
-              <div className="text-sm text-gray-600">Active Users</div>
-            </div>
-            <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="text-3xl font-bold text-teal-600 mb-2">99.9%</div>
-              <div className="text-sm text-gray-600">Uptime</div>
-            </div>
-            <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="text-3xl font-bold text-blue-500 mb-2">24/7</div>
-              <div className="text-sm text-gray-600">Support</div>
-            </div>
           </div>
         </div>
       </div>
 
-      {/* Right side - Login Form */}
+      {/* Right side - Register Form */}
       <div className="w-full lg:w-1/2 max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900">Welcome Back</h2>
-            <p className="text-gray-600 mt-2">Sign in to your HealthyCareNow account</p>
+            <h2 className="text-2xl font-bold text-gray-900">Create Account</h2>
+            <p className="text-gray-600 mt-2">Sign up for a new HealthyCareNow account</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Full Name Field */}
+            <div className="space-y-2">
+              <Label htmlFor="fullName" className="text-sm font-semibold text-gray-700">
+                Full Name
+              </Label>
+              <Input
+                id="fullName"
+                type="text"
+                placeholder="Dr. John Doe"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                disabled={isSubmitting || isLoading}
+                required
+                className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              />
+            </div>
+
             {/* Email Field */}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-semibold text-gray-700">
@@ -94,23 +104,16 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isSubmitting || isLoading}
+                required
                 className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
             </div>
 
             {/* Password Field */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-sm font-semibold text-gray-700">
-                  Password
-                </Label>
-                <button
-                  type="button"
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  Forgot password?
-                </button>
-              </div>
+              <Label htmlFor="password" className="text-sm font-semibold text-gray-700">
+                Password
+              </Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -119,6 +122,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isSubmitting || isLoading}
+                  required
                   className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all pr-10"
                 />
                 <button
@@ -135,6 +139,25 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Confirm Password Field */}
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className="text-sm font-semibold text-gray-700">
+                Confirm Password
+              </Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  disabled={isSubmitting || isLoading}
+                  required
+                  className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all pr-10"
+                />
+              </div>
+            </div>
+
             {/* Error Message */}
             {error && (
               <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -146,53 +169,26 @@ export default function LoginPage() {
             {/* Submit Button */}
             <Button
               type="submit"
-              disabled={isSubmitting || isLoading || !email || !password}
+              disabled={isSubmitting || isLoading || !email || !password || !fullName || !confirmPassword}
               className="w-full py-3 bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700 text-white font-semibold rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isSubmitting || isLoading ? (
                 <>
                   <Spinner className="w-4 h-4" />
-                  Signing in...
+                  Creating account...
                 </>
               ) : (
-                'Sign In'
+                'Sign Up'
               )}
             </Button>
-
-            {/* Demo Credentials */}
-            <div className="pt-4 border-t border-gray-200">
-              <p className="text-xs text-gray-600 text-center mb-3">Demo Credentials:</p>
-              <div className="space-y-2 text-xs text-gray-600">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail('doctor@example.com');
-                    setPassword('password123');
-                  }}
-                  className="block w-full text-left p-2 rounded hover:bg-gray-100 transition-colors"
-                >
-                  Email: <span className="font-mono text-gray-700">doctor@example.com</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail('admin@example.com');
-                    setPassword('password123');
-                  }}
-                  className="block w-full text-left p-2 rounded hover:bg-gray-100 transition-colors"
-                >
-                  Email: <span className="font-mono text-gray-700">admin@example.com</span>
-                </button>
-              </div>
-            </div>
           </form>
         </div>
 
         {/* Footer Text */}
         <p className="text-center text-sm text-gray-600 mt-6">
-          New to HealthyCareNow?{' '}
-          <button onClick={() => router.push('/register')} className="text-blue-600 hover:text-blue-700 font-semibold">
-            Create an account
+          Already have an account?{' '}
+          <button onClick={() => router.push('/login')} className="text-blue-600 hover:text-blue-700 font-semibold">
+            Sign in
           </button>
         </p>
       </div>

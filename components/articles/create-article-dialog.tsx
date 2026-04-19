@@ -21,27 +21,23 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Upload } from 'lucide-react';
+import { Upload, AlertCircle, Sparkles, Loader } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
+import { useAuth } from '@/contexts/auth-context';
+import { uploadToS3, validateS3Config } from '@/lib/s3-upload';
 
 interface CreateArticleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (article: {
-    title: string;
-    category: string;
-    status: 'Published' | 'Draft' | 'Scheduled';
-    content?: string;
-    image?: File;
-    useAI?: boolean;
-  }) => void;
+  onSubmit: (article: any) => void;
 }
 
 const categories = [
-  'Cardiology',
-  'Mental Health',
-  'Nutrition',
-  'Surgery',
-  'Endocrinology',
+  "Disease",
+  "Nutrition",
+  "Lifestyle",
+  "Medication",
+  "Medical Knowledge"
 ];
 
 const statuses = ['Draft', 'Published', 'Scheduled'];
@@ -51,59 +47,143 @@ export function CreateArticleDialog({
   onOpenChange,
   onSubmit,
 }: CreateArticleDialogProps) {
+  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
-  const [status, setStatus] = useState('Draft');
+  const [status, setStatus] = useState('DRAFT');
+  const [summary, setSummary] = useState('');
   const [content, setContent] = useState('');
-  const [image, setImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>('');
+  const [coverImageUrl, setCoverImageUrl] = useState('');
+  const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
   const [useAI, setUseAI] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [s3Uploading, setS3Uploading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+  const handleGenerateWithAI = async () => {
+    if (!title.trim() || !category) {
+      setError('Please fill in Title and Category before generating content');
+      return;
     }
+
+    setAiGenerating(true);
+    setError('');
+
+    try {
+      console.log('[v0] Generating article with AI:', { title: title.trim(), category });
+
+      const response = await apiClient.generateArticleWithAI({
+        title: title.trim(),
+        category,
+      });
+
+      console.log('[v0] AI generated content:', response);
+
+      // Set the generated content
+      setContent(response.content);
+
+      // Mark as AI generated - this is important!
+      setUseAI(true);
+
+      console.log('[v0] Content set, aiGenerated will be true on submit');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate content';
+      setError(errorMessage);
+      console.error('[v0] Error generating content:', err);
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const handleImageUpload = async (file: File) => {
+    if (!validateS3Config()) {
+      setError('AWS S3 configuration missing. Please set NEXT_PUBLIC_AWS_ACCESS_KEY_ID, NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY, and NEXT_PUBLIC_AWS_S3_BUCKET in .env.local');
+      return;
+    }
+
+    setS3Uploading(true);
+    setError('');
+
+    try {
+      const url = await uploadToS3(file);
+      console.log('[v0] Image uploaded to S3:', url);
+      setCoverImageUrl(url);
+      setCoverImageFile(file);
+      console.log("---------------");
+      console.log(url);
+      console.log(file);
+      console.log("---------------");
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to upload image';
+      setError(errorMessage);
+      console.error('[v0] Error uploading image:', err);
+    } finally {
+      setS3Uploading(false);
+    }
+
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
 
     if (!title.trim() || !category) {
-      alert('Please fill in all required fields');
+      setError('Please fill in all required fields: Title and Category');
       return;
     }
 
     setLoading(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      // Build the request according to ArticleUpsertRequest DTO
+      const articleRequest: any = {
+        title: title.trim(),
+        category,
+        status: status, // DRAFT, REVIEW, SCHEDULED, PUBLISHED
+        summary: summary.trim(),
+        content: content.trim() || (useAI ? 'AI Generated Content' : ''),
+        aiGenerated: useAI === true, // Ensure it's always true when AI was used
+        authorId: user?.id,
+        authorName: user?.email || 'Anonymous',
+        seoKeywords: [],
+        metaTitle: title.trim(),
+        metaDescription: summary.trim() || title.trim(),
+        cover_image_url: coverImageUrl.trim(),
+      };
 
-    onSubmit({
-      title: title.trim(),
-      category,
-      status: status as 'Published' | 'Draft' | 'Scheduled',
-      content: content.trim(),
-      image: image || undefined,
-      useAI,
-    });
+      // Add coverImageUrl only if it has a value
+      if (coverImageUrl && coverImageUrl.trim()) {
+        articleRequest.coverImageUrl = coverImageUrl.trim();
+      }
 
-    // Reset form
-    setTitle('');
-    setCategory('');
-    setStatus('Draft');
-    setContent('');
-    setImage(null);
-    setImagePreview('');
-    setUseAI(false);
-    setLoading(false);
-    onOpenChange(false);
+      console.log('[v0] Article request:', articleRequest);
+
+      // Call the API to create the article
+      const response = await apiClient.createArticle(articleRequest);
+
+      console.log('[v0] Article created successfully:', response);
+
+      // Call the callback with the response
+      onSubmit(response);
+
+      // Reset form
+      setTitle('');
+      setCategory('');
+      setStatus('DRAFT');
+      setSummary('');
+      setContent('');
+      setCoverImageUrl('');
+      setUseAI(false);
+      setError('');
+      onOpenChange(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create article';
+      setError(errorMessage);
+      console.error('[v0] Error creating article:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -117,6 +197,14 @@ export function CreateArticleDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Error Message */}
+          {error && (
+            <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-200">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          )}
+
           {/* Title */}
           <div className="space-y-2">
             <Label htmlFor="title" className="font-semibold">
@@ -160,54 +248,76 @@ export function CreateArticleDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {statuses.map((stat) => (
-                    <SelectItem key={stat} value={stat}>
-                      {stat}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="DRAFT">Draft</SelectItem>
+                  <SelectItem value="REVIEW">Review</SelectItem>
+                  <SelectItem value="SCHEDULED">Scheduled</SelectItem>
+                  <SelectItem value="PUBLISHED">Published</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* Image Upload */}
+          {/* Summary */}
+          <div className="space-y-2">
+            <Label htmlFor="summary" className="font-semibold">
+              Summary
+            </Label>
+            <Input
+              id="summary"
+              placeholder="Brief summary of the article"
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+
+          {/* Cover Image */}
           <div className="space-y-2">
             <Label htmlFor="image" className="font-semibold">
-              Article Image
+              Cover Image (Upload to S3)
             </Label>
+
             <div className="relative">
               <input
-                id="image"
+                id="image-file"
                 type="file"
                 accept="image/*"
-                onChange={handleImageChange}
-                disabled={loading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImageUpload(file);
+                }}
+                disabled={loading || s3Uploading}
                 className="hidden"
               />
               <label
-                htmlFor="image"
+                htmlFor="image-file"
                 className="flex items-center justify-center w-full px-4 py-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors"
               >
-                {imagePreview ? (
-                  <div className="w-full">
+                {coverImageUrl ? (
+                  <div className="w-full text-center">
                     <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="w-full h-40 object-cover rounded-lg"
+                      src={coverImageUrl}
+                      alt="Cover preview"
+                      className="w-full h-40 object-cover rounded-lg mb-2"
                     />
-                    <p className="text-center text-sm text-gray-600 mt-2">
-                      Click to change image
+                    <p className="text-sm text-gray-600">
+                      {s3Uploading ? 'Uploading...' : 'Click to change image'}
                     </p>
                   </div>
                 ) : (
                   <div className="text-center">
-                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600">
-                      Click or drag image here
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      PNG, JPG, GIF up to 10MB
-                    </p>
+                    {s3Uploading ? (
+                      <>
+                        <Loader className="w-8 h-8 text-blue-600 mx-auto mb-2 animate-spin" />
+                        <p className="text-sm text-gray-600">Uploading to S3...</p>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600">Click or drag image here</p>
+                        <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 10MB</p>
+                      </>
+                    )}
                   </div>
                 )}
               </label>
@@ -216,38 +326,40 @@ export function CreateArticleDialog({
 
           {/* Content */}
           <div className="space-y-2">
-            <Label htmlFor="content" className="font-semibold">
-              Content {useAI && <span className="text-gray-500">(Optional with AI)</span>}
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="content" className="font-semibold">
+                Content {useAI && <span className="text-gray-500">(AI Generated)</span>}
+              </Label>
+              <button
+                type="button"
+                onClick={handleGenerateWithAI}
+                disabled={!title.trim() || !category || aiGenerating || loading}
+                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed"
+              >
+                {aiGenerating ? (
+                  <>
+                    <Loader size={14} className="animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} />
+                    Generate with AI
+                  </>
+                )}
+              </button>
+            </div>
             <Textarea
               id="content"
-              placeholder={useAI ? "Content will be generated by AI, or add your own..." : "Write your article content here..."}
+              placeholder="Write your article content here..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              disabled={loading}
-              className="min-h-[200px] resize-none"
+              disabled={loading || aiGenerating}
+              className="min-h-[250px] resize-none"
             />
             <p className="text-xs text-gray-500">
               {content.length} characters
             </p>
-          </div>
-
-          {/* AI Generation Checkbox */}
-          <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <Checkbox
-              id="useAI"
-              checked={useAI}
-              onCheckedChange={(checked) => setUseAI(checked as boolean)}
-              disabled={loading}
-            />
-            <Label htmlFor="useAI" className="flex-1 cursor-pointer mb-0">
-              <div className="flex flex-col gap-1">
-                <span className="font-semibold text-gray-900">Generate content with AI</span>
-                <span className="text-xs text-gray-600">
-                  Let AI generate article content based on your title and category
-                </span>
-              </div>
-            </Label>
           </div>
 
           <DialogFooter className="gap-3">
