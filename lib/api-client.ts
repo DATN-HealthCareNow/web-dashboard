@@ -233,7 +233,7 @@ class ApiClient {
 
   // User Management endpoints
   async getUsers(): Promise<UserResponse[]> {
-    return axiosClient.get('/api/v1/users');
+    return axiosClient.get('/api/v1/admin/users');
   }
 
   async changeUserRole(userId: string, role: string): Promise<UserResponse> {
