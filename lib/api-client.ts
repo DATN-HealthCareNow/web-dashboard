@@ -27,7 +27,7 @@ axiosClient.interceptors.request.use(
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
-        
+
         const userStr = localStorage.getItem('user');
         if (userStr) {
           const user = JSON.parse(userStr);
@@ -233,7 +233,7 @@ class ApiClient {
 
   // User Management endpoints
   async getUsers(): Promise<UserResponse[]> {
-    return axiosClient.get('/api/v1/admin/users');
+    return axiosClient.get('/api/v1/users');
   }
 
   async changeUserRole(userId: string, role: string): Promise<UserResponse> {
