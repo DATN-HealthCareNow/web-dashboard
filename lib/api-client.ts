@@ -233,16 +233,16 @@ class ApiClient {
 
   // User Management endpoints
   async getUsers(): Promise<UserResponse[]> {
-    return axiosClient.get('/api/v1/admin/users');
+    return axiosClient.get('/api/v1/users');
   }
 
   async changeUserRole(userId: string, role: string): Promise<UserResponse> {
-    return axiosClient.put(`/api/v1/admin/users/${userId}/role`, { role });
+    return axiosClient.put(`/api/v1/users/${userId}/role`, { role });
   }
 
   // Dashboard endpoints
   async getDashboardOverview(): Promise<DashboardOverviewResponse> {
-    return axiosClient.get('/api/v1/admin/dashboard/overview');
+    return axiosClient.get('/api/v1/dashboard/overview');
   }
 }
 
