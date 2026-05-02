@@ -49,10 +49,10 @@ export default function LoginPage() {
 
           <div className="space-y-4">
             <h2 className="text-5xl font-bold text-gray-900 leading-tight">
-              Healthcare Management at Your Fingertips
+              Personalized Health at Your Fingertips
             </h2>
             <p className="text-xl text-gray-600 max-w-md mx-auto">
-              Manage patient records, appointments, and analytics all in one secure platform
+              Manage users, personalize health content, and track platform analytics securely.
             </p>
           </div>
 
@@ -159,42 +159,10 @@ export default function LoginPage() {
               )}
             </Button>
 
-            {/* Demo Credentials */}
-            <div className="pt-4 border-t border-gray-200">
-              <p className="text-xs text-gray-600 text-center mb-3">Demo Credentials:</p>
-              <div className="space-y-2 text-xs text-gray-600">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail('doctor@example.com');
-                    setPassword('password123');
-                  }}
-                  className="block w-full text-left p-2 rounded hover:bg-gray-100 transition-colors"
-                >
-                  Email: <span className="font-mono text-gray-700">doctor@example.com</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail('admin@example.com');
-                    setPassword('password123');
-                  }}
-                  className="block w-full text-left p-2 rounded hover:bg-gray-100 transition-colors"
-                >
-                  Email: <span className="font-mono text-gray-700">admin@example.com</span>
-                </button>
-              </div>
-            </div>
           </form>
         </div>
 
-        {/* Footer Text */}
-        <p className="text-center text-sm text-gray-600 mt-6">
-          New to HealthyCareNow?{' '}
-          <button onClick={() => router.push('/register')} className="text-blue-600 hover:text-blue-700 font-semibold">
-            Create an account
-          </button>
-        </p>
+
       </div>
     </div>
   );

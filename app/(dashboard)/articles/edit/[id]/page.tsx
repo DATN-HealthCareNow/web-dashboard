@@ -1,14 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { Sidebar } from '@/components/sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,17 +14,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { AlertCircle, Sparkles, Loader, Cloud, RefreshCw, Edit2, Save, User, Box, Image as ImageIcon } from 'lucide-react';
+import { AlertCircle, Sparkles, Loader, Cloud, RefreshCw, Edit2, Save, User, Box, Image as ImageIcon, ArrowLeft } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/contexts/auth-context';
 import { uploadToS3, validateS3Config } from '@/lib/s3-upload';
-
-interface CreateArticleDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (article: any) => void;
-}
+import Link from 'next/link';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const categories = [
   "Disease",
@@ -40,14 +30,12 @@ const categories = [
   "Medical Knowledge"
 ];
 
-const statuses = ['Draft', 'Published', 'Scheduled'];
-
-export function CreateArticleDialog({
-  open,
-  onOpenChange,
-  onSubmit,
-}: CreateArticleDialogProps) {
+export default function EditArticlePage() {
+  const router = useRouter();
+  const params = useParams();
+  const articleId = params.id as string;
   const { user } = useAuth();
+  
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [status, setStatus] = useState('DRAFT');
@@ -56,11 +44,45 @@ export function CreateArticleDialog({
   const [coverImageUrl, setCoverImageUrl] = useState('');
   const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
   const [useAI, setUseAI] = useState(false);
+  
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [s3Uploading, setS3Uploading] = useState(false);
   const [error, setError] = useState('');
   const [isEditingContent, setIsEditingContent] = useState(false);
+  const [authorName, setAuthorName] = useState('');
+
+  useEffect(() => {
+    const fetchArticle = async () => {
+      try {
+        setPageLoading(true);
+        const article: any = await apiClient.getArticleById(articleId);
+        setTitle(article.title || '');
+        setCategory(article.category || '');
+        setStatus(article.status || 'DRAFT');
+        setSummary(article.summary || '');
+        setContent(article.content || '');
+        setCoverImageUrl(article.cover_image_url || '');
+        setUseAI(article.ai_generated || false);
+        setAuthorName(article.author_name || '');
+        
+        // If content is empty, start in edit mode
+        if (!article.content) {
+          setIsEditingContent(true);
+        }
+      } catch (err) {
+        console.error('Failed to fetch article:', err);
+        setError('Failed to load article data.');
+      } finally {
+        setPageLoading(false);
+      }
+    };
+
+    if (articleId) {
+      fetchArticle();
+    }
+  }, [articleId]);
 
   const handleGenerateWithAI = async () => {
     if (!title.trim() || !category) {
@@ -72,27 +94,18 @@ export function CreateArticleDialog({
     setError('');
 
     try {
-      console.log('[v0] Generating article with AI:', { title: title.trim(), category });
-
       const response = await apiClient.generateArticleWithAI({
         title: title.trim(),
         category,
       });
 
-      console.log('[v0] AI generated content:', response);
-
-      // Set the generated content
       setContent(response.content);
-
-      // Mark as AI generated - this is important!
       setUseAI(true);
       setIsEditingContent(false);
 
-      console.log('[v0] Content set, aiGenerated will be true on submit');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate content';
       setError(errorMessage);
-      console.error('[v0] Error generating content:', err);
     } finally {
       setAiGenerating(false);
     }
@@ -100,7 +113,7 @@ export function CreateArticleDialog({
 
   const handleImageUpload = async (file: File) => {
     if (!validateS3Config()) {
-      setError('AWS S3 configuration missing. Please set NEXT_PUBLIC_AWS_ACCESS_KEY_ID, NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY, and NEXT_PUBLIC_AWS_S3_BUCKET in .env.local');
+      setError('AWS S3 configuration missing. Please check .env.local');
       return;
     }
 
@@ -109,25 +122,17 @@ export function CreateArticleDialog({
 
     try {
       const url = await uploadToS3(file);
-      console.log('[v0] Image uploaded to S3:', url);
       setCoverImageUrl(url);
       setCoverImageFile(file);
-      console.log("---------------");
-      console.log(url);
-      console.log(file);
-      console.log("---------------");
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to upload image';
       setError(errorMessage);
-      console.error('[v0] Error uploading image:', err);
     } finally {
       setS3Uploading(false);
     }
-
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setError('');
 
     if (!title.trim() || !category) {
@@ -138,61 +143,80 @@ export function CreateArticleDialog({
     setLoading(true);
 
     try {
-      // Build the request according to ArticleUpsertRequest DTO
       const articleRequest: any = {
         title: title.trim(),
         category,
-        status: status, // DRAFT, REVIEW, SCHEDULED, PUBLISHED
+        status: status,
         summary: summary.trim(),
         content: content.trim() || (useAI ? 'AI Generated Content' : ''),
         ai_generated: useAI === true,
         author_id: user?.id,
-        author_name: user?.fullName || user?.email || 'Anonymous',
+        author_name: authorName || user?.fullName || user?.email || 'Anonymous',
         seo_keywords: [],
         meta_title: title.trim(),
         meta_description: summary.trim() || title.trim(),
         cover_image_url: coverImageUrl.trim(),
       };
 
-      // Add coverImageUrl only if it has a value
       if (coverImageUrl && coverImageUrl.trim()) {
         articleRequest.cover_image_url = coverImageUrl.trim();
       }
 
-      console.log('[v0] Article request:', articleRequest);
+      await apiClient.updateArticle(articleId, articleRequest);
 
-      // Call the API to create the article
-      const response = await apiClient.createArticle(articleRequest);
+      // Show success message
+      const message = document.createElement('div');
+      message.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+      message.textContent = `Article updated successfully!`;
+      document.body.appendChild(message);
 
-      console.log('[v0] Article created successfully:', response);
+      setTimeout(() => {
+        message.remove();
+      }, 3000);
 
-      // Call the callback with the response
-      onSubmit(response);
+      // Redirect back to articles list
+      router.push('/articles');
 
-      // Reset form
-      setTitle('');
-      setCategory('');
-      setStatus('DRAFT');
-      setSummary('');
-      setContent('');
-      setCoverImageUrl('');
-      setUseAI(false);
-      setError('');
-      onOpenChange(false);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create article';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update article';
       setError(errorMessage);
-      console.error('[v0] Error creating article:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl p-0 overflow-hidden bg-slate-50 border-none shadow-2xl">
-        <div className="flex flex-col h-[85vh] overflow-y-auto p-6 space-y-6">
+  if (pageLoading) {
+    return (
+      <div className="flex">
+        <Sidebar />
+        <main className="ml-64 flex-1 bg-gray-50 min-h-screen flex items-center justify-center">
+          <Loader className="w-8 h-8 animate-spin text-blue-600" />
+        </main>
+      </div>
+    );
+  }
 
+  return (
+    <div className="flex">
+      <Sidebar />
+      <main className="ml-64 flex-1 bg-gray-50 min-h-screen pb-12">
+        <header className="bg-white border-b border-gray-200 px-8 py-6 sticky top-0 z-10">
+          <div className="flex items-center gap-4">
+            <Link href="/articles" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Edit Article
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">
+                Update existing article or use AI to regenerate content.
+              </p>
+            </div>
+          </div>
+        </header>
+
+        <div className="p-8 max-w-5xl mx-auto space-y-6">
           {/* TOP PANEL: AI Content Brief */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex-shrink-0">
             {aiGenerating ? (
@@ -303,7 +327,7 @@ export function CreateArticleDialog({
                         className="bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 text-white border-0 shadow-sm"
                       >
                         <Sparkles className="w-4 h-4 mr-2" />
-                        Generate with AI
+                        Regenerate with AI
                       </Button>
                     </div>
                   </div>
@@ -354,7 +378,7 @@ export function CreateArticleDialog({
                     </Button>
                     <Button onClick={handleSubmit} disabled={loading} size="sm" className="bg-violet-700 hover:bg-violet-800 text-white">
                       {loading ? <Loader className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
-                      Save
+                      Save Changes
                     </Button>
                   </>
                 )}
@@ -387,7 +411,7 @@ export function CreateArticleDialog({
                   <div className="flex items-center gap-4 text-sm text-gray-500">
                     <div className="flex items-center gap-1.5">
                       <User className="w-4 h-4" />
-                      <span>{user?.fullName || user?.email || 'HealthCareNow AI'}</span>
+                      <span>{authorName || user?.fullName || user?.email || 'HealthCareNow AI'}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Box className="w-4 h-4" />
@@ -407,15 +431,21 @@ export function CreateArticleDialog({
                     </div>
                   )}
 
-                  <div className="prose max-w-none text-gray-700 whitespace-pre-wrap leading-relaxed">
-                    {content || <span className="text-gray-400 italic">No content yet. Click Edit to start writing or use AI to generate.</span>}
+                  <div className="prose max-w-none text-gray-700 leading-relaxed">
+                    {content ? (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {content}
+                      </ReactMarkdown>
+                    ) : (
+                      <span className="text-gray-400 italic">No content yet. Click Edit to start writing or use AI to generate.</span>
+                    )}
                   </div>
                 </div>
               )}
             </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </main>
+    </div>
   );
 }

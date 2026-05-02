@@ -6,6 +6,8 @@ import { Sidebar } from '@/components/sidebar';
 import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft, Edit2, Share2, Eye } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export default function ArticleDetailPage() {
   const params = useParams();
@@ -180,8 +182,10 @@ export default function ArticleDetailPage() {
 
           {/* Article Content */}
           <div className="prose prose-lg max-w-none mb-12">
-            <div className="text-gray-800 leading-relaxed whitespace-pre-wrap">
-              {article.content}
+            <div className="text-gray-800 leading-relaxed">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {article.content}
+              </ReactMarkdown>
             </div>
           </div>
 
