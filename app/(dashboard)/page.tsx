@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/sidebar';
 import { apiClient, DashboardOverviewResponse } from '@/lib/api-client';
 import { Loader2 } from 'lucide-react';
+import { log } from 'console';
 
 export default function DashboardPage() {
   const [overview, setOverview] = useState<DashboardOverviewResponse | null>(null);
@@ -16,7 +17,8 @@ export default function DashboardPage() {
       try {
         setLoading(true);
         const overviewData = await apiClient.getDashboardOverview();
-        
+        console.log(overviewData);
+
         setOverview(overviewData);
         setArticlesCount(overviewData.stats.totalArticles || 0);
       } catch (error) {
@@ -41,7 +43,7 @@ export default function DashboardPage() {
                 Dashboard Overview
               </h1>
               <p className="text-gray-600 mt-1">
-                Welcome to the healthcare management platform
+                Welcome to the personalized health management platform
               </p>
             </div>
             <div className="flex items-center gap-4">
@@ -52,7 +54,7 @@ export default function DashboardPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="px-4 py-2 rounded-lg bg-gray-100 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
               />
-              <button 
+              <button
                 onClick={() => alert('No new notifications')}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
@@ -110,27 +112,27 @@ export default function DashboardPage() {
                   <div className="space-y-3">
                     {overview?.onlineUsers && overview.onlineUsers.length > 0 ? (
                       overview.onlineUsers
-                        .filter(u => 
+                        .filter(u =>
                           (u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
                           (u.location && u.location.toLowerCase().includes(searchQuery.toLowerCase()))
                         )
                         .slice(0, 10)
                         .map((user, idx) => (
-                        <div key={idx} className="flex items-center justify-between pb-3 border-b border-gray-100 last:border-0">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">{user.email || 'Unknown User'}</p>
-                            <p className="text-xs text-gray-500">{user.location}</p>
+                          <div key={idx} className="flex items-center justify-between pb-3 border-b border-gray-100 last:border-0">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{user.email || 'Unknown User'}</p>
+                              <p className="text-xs text-gray-500">{user.location}</p>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                                Online
+                              </span>
+                              <p className="text-[10px] text-gray-400 mt-1">
+                                {new Date(user.connectedAt).toLocaleTimeString()}
+                              </p>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                              Online
-                            </span>
-                            <p className="text-[10px] text-gray-400 mt-1">
-                              {new Date(user.connectedAt).toLocaleTimeString()}
-                            </p>
-                          </div>
-                        </div>
-                      ))
+                        ))
                     ) : (
                       <p className="text-sm text-gray-500">No users currently online.</p>
                     )}

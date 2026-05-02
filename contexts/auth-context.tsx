@@ -7,6 +7,7 @@ interface User {
   id: string;
   email: string;
   role?: string;
+  fullName?: string;
 }
 
 interface AuthContextType {
@@ -60,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: response.user_id,
         email: response.email,
         role: response.role,
+        fullName: response.full_name,
       };
 
       setUser(newUser);

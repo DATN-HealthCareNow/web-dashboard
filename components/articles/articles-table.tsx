@@ -19,7 +19,7 @@ export function ArticlesTable({ articles = [], onEdit, onPublish }: ArticlesTabl
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 5;
 
   const uniqueCategories = useMemo(() => {
     const cats = new Set(articles.map(a => a.category).filter(Boolean));
@@ -154,7 +154,7 @@ export function ArticlesTable({ articles = [], onEdit, onPublish }: ArticlesTabl
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
               <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase">
-                <input type="checkbox" className="rounded" />
+                #
               </th>
               <th className="text-left py-4 px-6 text-xs font-semibold text-gray-600 uppercase">
                 Article Title
@@ -187,13 +187,13 @@ export function ArticlesTable({ articles = [], onEdit, onPublish }: ArticlesTabl
                 </td>
               </tr>
             ) : (
-              displayArticles.map((article) => (
+              displayArticles.map((article, index) => (
                 <tr
                   key={article.id}
                   className="border-b border-gray-100 hover:bg-gray-50"
                 >
-                  <td className="py-4 px-6">
-                    <input type="checkbox" className="rounded" />
+                  <td className="py-4 px-6 text-sm font-medium text-gray-500">
+                    {startIndex + index + 1}
                   </td>
                   <td className="py-4 px-6">
                     <p className="font-medium text-gray-900">{article.title}</p>

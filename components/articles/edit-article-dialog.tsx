@@ -20,9 +20,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Upload, Sparkles, Loader } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/contexts/auth-context';
+import { uploadToS3, validateS3Config } from '@/lib/s3-upload';
 
 interface EditArticleDialogProps {
   open: boolean;
@@ -52,6 +53,10 @@ export function EditArticleDialog({
   const [summary, setSummary] = useState('');
   const [content, setContent] = useState('');
   const [coverImageUrl, setCoverImageUrl] = useState('');
+  const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
+  const [useAI, setUseAI] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [s3Uploading, setS3Uploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -63,10 +68,65 @@ export function EditArticleDialog({
       setStatus(article.status || 'DRAFT');
       setSummary(article.summary || '');
       setContent(article.content || '');
-      setCoverImageUrl(article.coverImageUrl || '');
+      // Handle both camelCase and snake_case depending on how the backend returns it
+      setCoverImageUrl(article.coverImageUrl || article.cover_image_url || '');
+      setUseAI(article.aiGenerated || false);
       setError('');
     }
   }, [article, open]);
+
+  const handleGenerateWithAI = async () => {
+    if (!title.trim() || !category) {
+      setError('Please fill in Title and Category before generating content');
+      return;
+    }
+
+    setAiGenerating(true);
+    setError('');
+
+    try {
+      console.log('[v0] Generating article with AI:', { title: title.trim(), category });
+
+      const response = await apiClient.generateArticleWithAI({
+        title: title.trim(),
+        category,
+      });
+
+      console.log('[v0] AI generated content:', response);
+
+      setContent(response.content);
+      setUseAI(true);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate content';
+      setError(errorMessage);
+      console.error('[v0] Error generating content:', err);
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const handleImageUpload = async (file: File) => {
+    if (!validateS3Config()) {
+      setError('AWS S3 configuration missing. Please set NEXT_PUBLIC_AWS_ACCESS_KEY_ID, NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY, and NEXT_PUBLIC_AWS_S3_BUCKET in .env.local');
+      return;
+    }
+
+    setS3Uploading(true);
+    setError('');
+
+    try {
+      const url = await uploadToS3(file);
+      console.log('[v0] Image uploaded to S3:', url);
+      setCoverImageUrl(url);
+      setCoverImageFile(file);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to upload image';
+      setError(errorMessage);
+      console.error('[v0] Error uploading image:', err);
+    } finally {
+      setS3Uploading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,19 +141,23 @@ export function EditArticleDialog({
 
     try {
       // Build the request according to ArticleUpsertRequest DTO
-      const articleRequest = {
+      const articleRequest: any = {
         title: title.trim(),
         category,
         status: status,
         summary: summary.trim(),
-        content: content.trim(),
-        coverImageUrl: coverImageUrl.trim() || undefined,
-        authorId: user?.id,
-        authorName: user?.email || 'Anonymous',
-        seoKeywords: article?.seoKeywords || [],
-        metaTitle: title.trim(),
-        metaDescription: summary.trim() || title.trim(),
+        content: content.trim() || (useAI ? 'AI Generated Content' : ''),
+        ai_generated: useAI === true,
+        author_id: user?.id,
+        author_name: user?.fullName || user?.email || 'Anonymous',
+        seo_keywords: article?.seoKeywords || article?.seo_keywords || [],
+        meta_title: title.trim(),
+        meta_description: summary.trim() || title.trim(),
       };
+
+      if (coverImageUrl && coverImageUrl.trim()) {
+        articleRequest.cover_image_url = coverImageUrl.trim();
+      }
 
       // Call the API to update the article
       const response = await apiClient.updateArticle(article.id, articleRequest);
@@ -110,6 +174,7 @@ export function EditArticleDialog({
       setSummary('');
       setContent('');
       setCoverImageUrl('');
+      setUseAI(false);
       setError('');
       onOpenChange(false);
     } catch (err) {
@@ -206,33 +271,91 @@ export function EditArticleDialog({
             />
           </div>
 
-          {/* Cover Image URL */}
+          {/* Cover Image */}
           <div className="space-y-2">
             <Label htmlFor="image" className="font-semibold">
-              Cover Image URL
+              Cover Image (Upload to S3)
             </Label>
-            <Input
-              id="image"
-              placeholder="https://example.com/image.jpg"
-              value={coverImageUrl}
-              onChange={(e) => setCoverImageUrl(e.target.value)}
-              disabled={loading}
-              type="url"
-            />
+
+            <div className="relative">
+              <input
+                id="edit-image-file"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImageUpload(file);
+                }}
+                disabled={loading || s3Uploading}
+                className="hidden"
+              />
+              <label
+                htmlFor="edit-image-file"
+                className="flex items-center justify-center w-full px-4 py-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors"
+              >
+                {coverImageUrl ? (
+                  <div className="w-full text-center">
+                    <img
+                      src={coverImageUrl}
+                      alt="Cover preview"
+                      className="w-full h-40 object-cover rounded-lg mb-2"
+                    />
+                    <p className="text-sm text-gray-600">
+                      {s3Uploading ? 'Uploading...' : 'Click to change image'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    {s3Uploading ? (
+                      <>
+                        <Loader className="w-8 h-8 text-blue-600 mx-auto mb-2 animate-spin" />
+                        <p className="text-sm text-gray-600">Uploading to S3...</p>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600">Click or drag image here</p>
+                        <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 10MB</p>
+                      </>
+                    )}
+                  </div>
+                )}
+              </label>
+            </div>
           </div>
 
           {/* Content */}
           <div className="space-y-2">
-            <Label htmlFor="content" className="font-semibold">
-              Content
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="content" className="font-semibold">
+                Content {useAI && <span className="text-gray-500">(AI Generated)</span>}
+              </Label>
+              <button
+                type="button"
+                onClick={handleGenerateWithAI}
+                disabled={!title.trim() || !category || aiGenerating || loading}
+                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed"
+              >
+                {aiGenerating ? (
+                  <>
+                    <Loader size={14} className="animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} />
+                    Generate with AI
+                  </>
+                )}
+              </button>
+            </div>
             <Textarea
               id="content"
               placeholder="Write your article content here..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              disabled={loading}
-              className="min-h-[200px] resize-none"
+              disabled={loading || aiGenerating}
+              className="min-h-[250px] resize-none"
             />
             <p className="text-xs text-gray-500">
               {content.length} characters

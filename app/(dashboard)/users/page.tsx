@@ -19,16 +19,9 @@ export default function UsersPage() {
                 User Management
               </h1>
               <p className="text-gray-600 mt-1">
-                Manage access, roles, and status for all hospital staff.
+                Manage access, roles, and status for all registered users.
               </p>
             </div>
-            <button 
-              onClick={() => router.push('/register')}
-              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-            >
-              <Plus size={20} />
-              Add New User
-            </button>
           </div>
         </header>
 

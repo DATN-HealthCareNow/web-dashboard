@@ -3,16 +3,14 @@
 import { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/sidebar';
 import { ArticlesTable } from '@/components/articles/articles-table';
-import { CreateArticleDialog } from '@/components/articles/create-article-dialog';
-import { EditArticleDialog } from '@/components/articles/edit-article-dialog';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
 export default function ArticlesPage() {
-  const [openCreateDialog, setOpenCreateDialog] = useState(false);
-  const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [selectedArticle, setSelectedArticle] = useState<any>(null);
+  const router = useRouter();
   const [articles, setArticles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,46 +33,10 @@ export default function ArticlesPage() {
     fetchArticles();
   }, []);
 
-  const handleCreateArticle = async (article: any) => {
-    // Article has already been created via API in the dialog
-    // Just add it to the local state for immediate UI update
-    setArticles([article, ...articles]);
-    setOpenCreateDialog(false);
 
-    // Show success message
-    const message = document.createElement('div');
-    message.className =
-      'fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-    const aiNote = article.aiGenerated ? ' (AI-generated)' : '';
-    message.textContent = `Article "${article.title}"${aiNote} created successfully!`;
-    document.body.appendChild(message);
-
-    setTimeout(() => {
-      message.remove();
-    }, 3000);
-  };
 
   const handleEditClick = (article: any) => {
-    setSelectedArticle(article);
-    setOpenEditDialog(true);
-  };
-
-  const handleUpdateArticle = (updatedArticle: any) => {
-    // Update the article in the list
-    setArticles(articles.map(a => a.id === updatedArticle.id ? updatedArticle : a));
-    setOpenEditDialog(false);
-    setSelectedArticle(null);
-
-    // Show success message
-    const message = document.createElement('div');
-    message.className =
-      'fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-    message.textContent = `Article "${updatedArticle.title}" updated successfully!`;
-    document.body.appendChild(message);
-
-    setTimeout(() => {
-      message.remove();
-    }, 3000);
+    router.push(`/articles/edit/${article.id}`);
   };
 
   const handlePublishArticle = async (article: any) => {
@@ -121,17 +83,18 @@ export default function ArticlesPage() {
                 Article Management
               </h1>
               <p className="text-gray-600 mt-1">
-                {loading ? 'Loading articles...' : `Manage, edit, and publish medical content and health tips. (${articles.length} articles)`}
+                {loading ? 'Loading articles...' : `Manage, edit, and publish health articles and personalized content. (${articles.length} articles)`}
               </p>
             </div>
-            <Button
-              onClick={() => setOpenCreateDialog(true)}
-              disabled={loading}
-              className="flex items-center gap-2"
-            >
-              <Plus size={20} />
-              Create New Article
-            </Button>
+            <Link href="/articles/create">
+              <Button
+                disabled={loading}
+                className="flex items-center gap-2"
+              >
+                <Plus size={20} />
+                Create New Article
+              </Button>
+            </Link>
           </div>
         </header>
 
@@ -151,20 +114,9 @@ export default function ArticlesPage() {
           )}
         </div>
 
-        {/* Create Article Dialog */}
-        <CreateArticleDialog
-          open={openCreateDialog}
-          onOpenChange={setOpenCreateDialog}
-          onSubmit={handleCreateArticle}
-        />
 
-        {/* Edit Article Dialog */}
-        <EditArticleDialog
-          open={openEditDialog}
-          onOpenChange={setOpenEditDialog}
-          article={selectedArticle}
-          onSubmit={handleUpdateArticle}
-        />
+
+
       </main>
     </div>
   );

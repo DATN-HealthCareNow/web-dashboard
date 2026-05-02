@@ -12,6 +12,10 @@ const nextConfig = {
         source: '/api/:path*',
         destination: 'http://52.220.93.185/api/:path*',
       },
+      {
+        source: '/ai/:path*',
+        destination: 'http://52.220.93.185/ai/:path*',
+      },
     ]
   },
 }
